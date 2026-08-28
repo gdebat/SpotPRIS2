@@ -17,7 +17,7 @@ setup(name="SpotPRIS2",
       install_requires=[
           "PyGObject",
           "pydbus",
-          "spotipy>=2.8",
+          "spotipy>=2.18",
           "appdirs",
       ],
       entry_points={

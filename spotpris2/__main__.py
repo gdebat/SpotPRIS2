@@ -1,20 +1,22 @@
 from gi.repository import GLib
 from pydbus import SessionBus
-from spotipy import SpotifyOAuth, Spotify
+from spotipy import Spotify
+from spotipy.cache_handler import CacheFileHandler
+from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 from appdirs import AppDirs
 from configparser import ConfigParser
-from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from .BusManager import SingleBusManager, MultiBusManager
 from . import MediaPlayer2
 import pkg_resources
-import webbrowser
 import argparse
+import os
 
 ifaces = ["org.mpris.MediaPlayer2",
           "org.mpris.MediaPlayer2.Player"]  # , "org.mpris.MediaPlayer2.Playlists", "org.mpris.MediaPlayer2.TrackList"]
 dirs = AppDirs("spotpris2", "freundTech")
 scope = "user-modify-playback-state,user-read-playback-state,user-read-currently-playing"
+redirect_uri = "http://127.0.0.1:8000"
 
 
 def main():
@@ -85,39 +87,58 @@ def main():
         pass
 
 
+class ReauthorizingSpotifyOAuth(SpotifyOAuth):
+    """Start a fresh authorization flow when a cached grant is revoked."""
+
+    def validate_token(self, token_info):
+        try:
+            return super().validate_token(token_info)
+        except SpotifyOauthError as error:
+            if not _is_invalid_grant(error):
+                raise
+
+            print("Spotify authorization has expired or was revoked. "
+                  "Starting a new authorization flow.")
+            _remove_cached_token(self.cache_handler)
+            return None
+
+
 def authenticate():
-    class RequestHandler(BaseHTTPRequestHandler):
-        callbackUri = None
-
-        def do_GET(self):
-            self.send_response(200, "OK")
-            self.end_headers()
-
-            self.wfile.write(pkg_resources.resource_string(__name__, "html/success.html"))
-            RequestHandler.callbackUri = self.path
-
     config = get_config()
+    cache_handler = CacheFileHandler(cache_path=dirs.user_cache_dir)
 
-    oauth = SpotifyOAuth(
+    oauth = ReauthorizingSpotifyOAuth(
         client_id=config["client_id"],
         client_secret=config["client_secret"],
-        redirect_uri="http://localhost:8000",
+        redirect_uri=redirect_uri,
         scope=scope,
-        cache_path=dirs.user_cache_dir,
+        cache_handler=cache_handler,
     )
 
-    token_info = oauth.get_cached_token()
+    token_info = oauth.validate_token(cache_handler.get_cached_token())
 
     if not token_info:
-        url = oauth.get_authorize_url()
-        webbrowser.open(url)
-
-        server = HTTPServer(('', 8000), RequestHandler)
-        server.handle_request()
-
-        code = oauth.parse_response_code(RequestHandler.callbackUri)
-        oauth.get_access_token(code, as_dict=False)
+        # SpotifyOAuth opens the browser, receives the loopback callback, and
+        # persists the resulting token through the configured cache handler.
+        oauth.get_access_token(as_dict=False, check_cache=False)
     return oauth
+
+
+def _is_invalid_grant(error):
+    error_code = getattr(error, "error", None)
+    if error_code is not None:
+        return error_code == "invalid_grant"
+
+    # Older Spotipy releases did not always expose the OAuth error code as a
+    # structured field. Keep the compatibility fallback intentionally narrow.
+    return "invalid_grant" in str(error).lower()
+
+
+def _remove_cached_token(cache_handler):
+    try:
+        os.remove(cache_handler.cache_path)
+    except FileNotFoundError:
+        pass
 
 
 def get_config():
@@ -129,7 +150,7 @@ def get_config():
     if section.get("client_id") is None or section.get("client_secret") is None:
         print("To use this software you need to provide your own spotify developer credentials. Go to "
               "https://developer.spotify.com/dashboard/applications, create a new client id and add "
-              "http://localhost:8000 to the redirect URIs.")
+              f"{redirect_uri} to the redirect URIs.")
         section["client_id"] = input("Enter client id: ")
         section["client_secret"] = input("Enter client secret: ")
         with open(f"{dirs.user_config_dir}.cfg", 'w+') as f:

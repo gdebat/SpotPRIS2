@@ -21,6 +21,24 @@ Installation
 
 Then just run `spotpris2`.
 
+Spotify setup
+-------------
+SpotPRIS2 will ask for credentials from an application you create in the
+[Spotify Developer Dashboard](https://developer.spotify.com/dashboard). Add this exact redirect URI to the
+application's settings:
+
+```
+http://127.0.0.1:8000
+```
+
+The URI must match exactly; Spotify does not accept the `localhost` alias for loopback redirects. On first use,
+SpotPRIS2 opens a browser so you can authorize the application and then stores the resulting authorization in its
+application-specific user cache.
+
+Spotify can expire or revoke a refresh-token authorization. If that happens, SpotPRIS2 discards only the unusable
+cached authorization and automatically opens a new authorization flow. You do not normally need to delete the token
+cache manually.
+
 Options
 -------
 ```
@@ -59,5 +77,4 @@ To use SpotPRIS2 with systemd, the provided unit file (`contrib/spotpris2.servic
 
 This project is not affiliated, associated, authorized, endorsed by, or in any way officially connected with Spotify AB,
 or any of its subsidiaries or its affiliates.
-
 
