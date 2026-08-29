@@ -18,6 +18,13 @@ Installation
     ```yay -S python-spotpris2```
 * Other distributions: Install using pip  
     ```pip install spotPRIS2```
+* From source using pipx: Clone the repository, change into its root directory, and run:
+
+    ```bash
+    pipx install .
+    ```
+
+    To reinstall the package after making local changes, run `pipx install --force .`.
 
 Then just run `spotpris2`.
 
@@ -77,4 +84,3 @@ To use SpotPRIS2 with systemd, the provided unit file (`contrib/spotpris2.servic
 
 This project is not affiliated, associated, authorized, endorsed by, or in any way officially connected with Spotify AB,
 or any of its subsidiaries or its affiliates.
-

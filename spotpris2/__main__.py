@@ -5,10 +5,10 @@ from spotipy.cache_handler import CacheFileHandler
 from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 from appdirs import AppDirs
 from configparser import ConfigParser
+from pkgutil import get_data
 
 from .BusManager import SingleBusManager, MultiBusManager
 from . import MediaPlayer2
-import pkg_resources
 import argparse
 import os
 
@@ -17,6 +17,11 @@ ifaces = ["org.mpris.MediaPlayer2",
 dirs = AppDirs("spotpris2", "freundTech")
 scope = "user-modify-playback-state,user-read-playback-state,user-read-currently-playing"
 redirect_uri = "http://127.0.0.1:8000"
+
+
+def _load_mpris_interfaces():
+    return [get_data("spotpris2", f"mpris/{iface}.xml").decode("utf-8")
+            for iface in ifaces]
 
 
 def main():
@@ -32,8 +37,7 @@ def main():
                         "bus name (experimental)")
     args = parser.parse_args()
 
-    MediaPlayer2.dbus = [pkg_resources.resource_string(__name__, f"mpris/{iface}.xml").decode('utf-8') for iface in
-                         ifaces]
+    MediaPlayer2.dbus = _load_mpris_interfaces()
 
     loop = GLib.MainLoop()
 
